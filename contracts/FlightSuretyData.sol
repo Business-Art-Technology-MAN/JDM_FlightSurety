@@ -12,6 +12,18 @@ contract FlightSuretyData {
     address private contractOwner;                                      // Account used to deploy contract
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
 
+    mapping(address => bool) public authorizedAddress;
+
+    //begin Airline
+    struct Airline{
+        bool is_registered;
+        bool is_funded;
+    }
+
+    mapping(address => Airline) public airlines;
+
+    //end Airline
+
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
@@ -27,6 +39,8 @@ contract FlightSuretyData {
                                 public 
     {
         contractOwner = msg.sender;
+        authorizedAddress[contractOwner] = true;
+
     }
 
     /********************************************************************************************/
@@ -56,10 +70,27 @@ contract FlightSuretyData {
         _;
     }
 
+    /**
+    * @dev Modifier that requires the an authoriezed account to be the function caller
+    */
+    modifier callerAuthorized() 
+    {
+        require(authorizedAddress[msg.sender] == true, "Address not authorized to call this function");
+        _;
+    }
+
+    
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
-
+    
+    /**
+    * @dev function that requires the calling address to be authorized
+    */
+    function authorizeCaller(address callerAddress)
+    {
+        authorizedAddress[callerAddress] = true;
+    }
     /**
     * @dev Get operating status of contract
     *
@@ -72,7 +103,6 @@ contract FlightSuretyData {
     {
         return operational;
     }
-
 
     /**
     * @dev Sets contract operations on/off
