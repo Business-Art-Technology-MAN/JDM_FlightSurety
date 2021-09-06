@@ -6,6 +6,9 @@ pragma solidity ^0.4.25;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
+//data and logic separation for contracts
+import "../contracts/FlightSuretyData.sol";
+
 /************************************************** */
 /* FlightSurety Smart Contract                      */
 /************************************************** */
@@ -34,7 +37,8 @@ contract FlightSuretyApp {
     }
     mapping(bytes32 => Flight) private flights;
 
- 
+    FlightSuretyData fsd;
+
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
@@ -63,6 +67,15 @@ contract FlightSuretyApp {
         _;
     }
 
+    /**
+    * @dev Modifier that requires airline is funded
+    */
+    modifier airline_is_funded()
+    {
+        require(!fsd.isFundedAirline(msg.sender), "Caller is not a funded airline");
+        _;
+    }
+
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
     /********************************************************************************************/
@@ -73,10 +86,12 @@ contract FlightSuretyApp {
     */
     constructor
                                 (
+                                    
                                 ) 
                                 public 
     {
         contractOwner = msg.sender;
+        fsd = FlightSuretyData(contractOwner);
     }
 
     /********************************************************************************************/
@@ -94,20 +109,61 @@ contract FlightSuretyApp {
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
-
+    /**
+    * @dev vote on airline consensus
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */
+    function concensusVote(address airlineToAdd, address sponsorAirline) 
+                            public
+                            
+                            returns(uint256)
+    {
+        uint256 current_votes = fsd.get_airline_vote_count(airlineToAdd);
+        if(current_votes != 0){
+            address[] memory voter_array = fsd.get_airline_sponsor_array(airlineToAdd);
+            for(uint i=0; i < current_votes; i++){
+                require(voter_array[i] != sponsorAirline, "Airline has already voted!");
+            }
+        }
+        
+        uint256 airline_votes = fsd.add_vote_for_airline(airlineToAdd, sponsorAirline);
+        return airline_votes;
+    }
+    
   
-   /**
+    /**
     * @dev Add an airline to the registration queue
     *
     */   
     function registerAirline
                             (   
+                                address new_airline,
+                                bool vote
                             )
                             external
-                            pure
+                            airline_is_funded
                             returns(bool success, uint256 votes)
     {
-        return (success, 0);
+        //registration rules and login need to be added.
+        bool is_registered = false;
+        uint256 num_votes = 0;
+        //when fewer than 4 airlines are registered make sure the contract owner adds airlines
+        if(fsd.get_airline_count() < 4){
+            require(msg.sender == contractOwner, "Must be called by contract owner airline until >= 4 airlines.");
+            is_registered = fsd.registerAirline(new_airline);
+        }else if(vote){ //multi-party voting >= 50%
+            
+            num_votes = concensusVote(new_airline, msg.sender);
+            uint256 half = fsd.get_airline_count().div(2);
+            if(num_votes >= half){
+                fsd.registerAirline(new_airline);
+                is_registered = true;
+            }
+
+        }    
+        
+        return (is_registered, num_votes);
     }
 
 
@@ -118,7 +174,7 @@ contract FlightSuretyApp {
     function registerFlight
                                 (
                                 )
-                                external
+                                public
                                 pure
     {
 

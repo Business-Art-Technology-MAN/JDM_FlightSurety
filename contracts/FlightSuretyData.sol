@@ -4,6 +4,7 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract FlightSuretyData {
     using SafeMath for uint256;
+    //using SafeMath for uint8;
 
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
@@ -12,22 +13,26 @@ contract FlightSuretyData {
     address private contractOwner;                                      // Account used to deploy contract
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
 
-    mapping(address => bool) public authorizedAddress;
+    mapping(address => bool) private authorizedAddress;
 
     //begin Airline
     struct Airline{
         bool is_registered;
         bool is_funded;
+        uint256 votes;
     }
+    //Consensus data
+    mapping (address=>address[]) private consensusMap;
 
-    mapping(address => Airline) public airlines;
-
+    mapping(address => Airline) private airlines;
+    uint256 private count_airlines;
+    
     //end Airline
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
-
+     event airline_registered(address airline);
 
     /**
     * @dev Constructor
@@ -40,6 +45,7 @@ contract FlightSuretyData {
     {
         contractOwner = msg.sender;
         authorizedAddress[contractOwner] = true;
+        count_airlines = 0;
 
     }
 
@@ -87,7 +93,103 @@ contract FlightSuretyData {
     /**
     * @dev function that requires the calling address to be authorized
     */
+    function get_airline_count() 
+                                public
+                                view returns(uint256)
+
+    {
+        return count_airlines;
+    }
+    /**
+    * @dev function to check if airline is funded
+    */
+    function isFundedAirline(address check_airline) 
+                                public
+                                view 
+                                returns(bool)
+
+    {
+        bool funded = false;
+        if(airlines[check_airline].is_funded){
+            funded = true;
+        }
+        return funded;
+    }
+    /**
+    * @dev function to add airline
+    */
+    function get_airline_vote_count(address look_up_airline) 
+                                public
+                                view 
+                                returns(uint256)
+
+    {
+        return consensusMap[look_up_airline].length;
+    }
+    /**
+    * @dev function to add airline
+    */
+    function setAirlineAsRegistered(address authorize) 
+                            payable
+                            external
+    {
+        airlines[authorize].is_registered = true;
+        count_airlines = count_airlines.add(1);
+    }
+    /**
+    * @dev function to get the array of ailine sponsors for mulit-party logic
+    */
+    function get_airline_sponsor_array(address airline_to_check) 
+                            public
+                            view
+                            returns(address[] memory)
+    {
+        address[] memory tmp_out = new address[] (consensusMap[airline_to_check].length);
+        for(uint i =0; i < consensusMap[airline_to_check].length; i++){
+            tmp_out[i] = consensusMap[airline_to_check][i];
+        }
+        
+        return tmp_out;
+        
+    }
+    /**
+    * @dev function to get the array of ailine sponsors for mulit-party logic
+    */
+    function add_vote_for_airline(address for_airline, address sponsor) 
+                            public
+                            
+                            returns(uint256)
+    {
+        
+        
+        consensusMap[for_airline].push(sponsor);
+        airlines[for_airline].votes = airlines[for_airline].votes.add(1);
+
+        return  consensusMap[for_airline].length;
+        
+    }
+    /**
+    * @dev Get operating status of contract
+    *
+    * @return confirms status as airline
+    */      
+    function isAirline(address check_airline) 
+                            public 
+                            view 
+                            returns(bool) 
+    {
+        bool found = false;
+        if(airlines[check_airline].is_registered){
+            found = true;
+        }
+        return found;
+    }
+    /**
+    * @dev function that requires the calling address to be authorized
+    */
     function authorizeCaller(address callerAddress)
+                                                    public
+                                                    
     {
         authorizedAddress[callerAddress] = true;
     }
@@ -129,11 +231,17 @@ contract FlightSuretyData {
     *
     */   
     function registerAirline
-                            (   
+                            ( 
+                              address airline   
                             )
-                            external
-                            pure
+                            public
+                            returns(bool)
     {
+       airlines[airline].is_registered = true;
+
+       emit airline_registered(airline);
+
+       return true;
     }
 
 
