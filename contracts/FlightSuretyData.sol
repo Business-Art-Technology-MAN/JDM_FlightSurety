@@ -24,8 +24,9 @@ contract FlightSuretyData {
     //Consensus data
     mapping (address=>address[]) private consensusMap;
 
-    mapping(address => Airline) private airlines;
+    mapping(address => Airline) public airlines;
     uint256 private count_airlines;
+    address public first_airline;
     
     //end Airline
 
@@ -33,6 +34,7 @@ contract FlightSuretyData {
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
      event airline_registered(address airline);
+     event airline_funded(address airline);
 
     /**
     * @dev Constructor
@@ -40,12 +42,16 @@ contract FlightSuretyData {
     */
     constructor
                                 (
+                                    address original_airline
                                 ) 
                                 public 
     {
         contractOwner = msg.sender;
         authorizedAddress[contractOwner] = true;
-        count_airlines = 0;
+        airlines[original_airline].is_registered =true;
+        airlines[original_airline].is_funded = false;
+        first_airline = original_airline;
+        count_airlines = 1;
 
     }
 
@@ -103,7 +109,7 @@ contract FlightSuretyData {
     /**
     * @dev function to check if airline is funded
     */
-    function isFundedAirline(address check_airline) 
+    function is_funded_airline(address check_airline) 
                                 public
                                 view 
                                 returns(bool)
@@ -238,6 +244,7 @@ contract FlightSuretyData {
                             returns(bool)
     {
        airlines[airline].is_registered = true;
+       count_airlines = count_airlines.add(1);
 
        emit airline_registered(airline);
 
@@ -289,10 +296,15 @@ contract FlightSuretyData {
     */   
     function fund
                             (   
+                                address airline_to_fund
                             )
                             public
                             payable
     {
+        airlines[airline_to_fund].is_funded = true;
+        airlines[airline_to_fund].is_registered = false;
+        airlines[airline_to_fund].votes = 0;
+        emit airline_funded(airline_to_fund);
     }
 
     function getFlightKey
@@ -316,7 +328,8 @@ contract FlightSuretyData {
                             external 
                             payable 
     {
-        fund();
+        require(msg.data.length == 0);
+        fund(msg.sender);
     }
 
 

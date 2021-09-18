@@ -39,6 +39,8 @@ contract FlightSuretyApp {
 
     FlightSuretyData fsd;
 
+    bool private operational;
+
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
@@ -72,7 +74,7 @@ contract FlightSuretyApp {
     */
     modifier airline_is_funded()
     {
-        require(!fsd.isFundedAirline(msg.sender), "Caller is not a funded airline");
+        require(fsd.is_funded_airline(msg.sender), "Caller is not a funded airline");
         _;
     }
 
@@ -86,12 +88,12 @@ contract FlightSuretyApp {
     */
     constructor
                                 (
-                                    
-                                ) 
-                                public 
+                                 address dataContractAddress
+                                ) public 
     {
+        operational = true;
         contractOwner = msg.sender;
-        fsd = FlightSuretyData(contractOwner);
+        fsd = FlightSuretyData(dataContractAddress);
     }
 
     /********************************************************************************************/
@@ -100,10 +102,10 @@ contract FlightSuretyApp {
 
     function isOperational() 
                             public 
-                            pure 
+                            view 
                             returns(bool) 
     {
-        return true;  // Modify to call data contract's status
+        return operational;  // Modify to call data contract's status
     }
 
     /********************************************************************************************/
@@ -138,8 +140,8 @@ contract FlightSuretyApp {
     */   
     function registerAirline
                             (   
-                                address new_airline,
-                                bool vote
+                                address new_airline
+                                
                             )
                             external
                             airline_is_funded
@@ -150,9 +152,10 @@ contract FlightSuretyApp {
         uint256 num_votes = 0;
         //when fewer than 4 airlines are registered make sure the contract owner adds airlines
         if(fsd.get_airline_count() < 4){
-            require(msg.sender == contractOwner, "Must be called by contract owner airline until >= 4 airlines.");
+            
+            require(fsd.first_airline() == msg.sender, "Must be called by contract owner airline until >= 4 airlines.");
             is_registered = fsd.registerAirline(new_airline);
-        }else if(vote){ //multi-party voting >= 50%
+        }else{ //multi-party voting >= 50%
             
             num_votes = concensusVote(new_airline, msg.sender);
             uint256 half = fsd.get_airline_count().div(2);
@@ -165,7 +168,18 @@ contract FlightSuretyApp {
         
         return (is_registered, num_votes);
     }
+     /**
+    * @dev Fund an airline.
+    *
+    */ 
+    function fund_airline()
+    external
+    payable
+    {
+        fsd.fund.value(msg.value)(msg.sender);
 
+        
+    }
 
    /**
     * @dev Register a future flight for insuring.
